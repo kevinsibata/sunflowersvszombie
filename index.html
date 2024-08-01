@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Girassóis vs Zumbis</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #e0f7fa;
+        }
+        #game-area {
+            width: 600px;
+            height: 337.5px; /* Proporção 16:9 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px auto;
+            position: relative;
+            background-color: #f0f0f0;
+            border: 2px solid #000;
+        }
+        .zombie, .plant {
+            margin: 5px;
+        }
+        .zombie-container {
+            position: absolute;
+            right: 50px;
+            bottom: calc(50% - 50px); /* Centraliza verticalmente */
+            transition: transform 30s linear; /* Aumentado para 30 segundos */
+        }
+        .zombie {
+            width: 100px;
+            height: 100px;
+            background-image: url('https://i.imgur.com/B3S6qfv.png');
+            background-size: cover;
+            position: relative;
+            transition: opacity 1s;
+        }
+        .plant-container {
+            position: absolute;
+            left: 50px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-wrap: wrap;
+            width: 180px; /* Largura suficiente para três plantas de 50px mais margem */
+            height: 180px; /* Altura suficiente para três plantas de 50px mais margem */
+        }
+        .plant {
+            width: 50px;
+            height: 50px;
+            background-image: url('https://i.imgur.com/oLwSBkM.png');
+            background-size: cover;
+            margin: 5px;
+            position: relative;
+        }
+        .bullet {
+            width: 10px;
+            height: 10px;
+            background-color: green;
+            position: absolute;
+            border-radius: 50%;
+        }
+        .health-bar {
+            position: absolute;
+            top: -20px;
+            left: 0;
+            width: 100px;
+            height: 10px;
+            background-color: red;
+            transition: opacity 1s;
+        }
+        .health {
+            height: 100%;
+            background-color: green;
+            width: 100%;
+        }
+        #controls {
+            margin-top: 20px;
+        }
+        #result {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Girassóis vs Zumbis</h1>
+    <div id="game-area">
+        <div id="plants-area" class="plant-container"></div>
+        <div id="zombie-container" class="zombie-container">
+            <div class="health-bar" id="health-bar">
+                <div class="health" id="health"></div>
+            </div>
+            <div class="zombie" id="zombie"></div>
+        </div>
+    </div>
+    <div id="controls">
+        <button onclick="addPlant()">Adicionar Planta</button>
+        <button onclick="startGame()">Iniciar Jogo</button>
+        <button onclick="resetGame()">Reiniciar Jogo</button>
+    </div>
+    <p id="result"></p>
+
+    <script>
+        let plantCount = 0;
+        const zombieHealth = 100;
+        const damagePerBullet = 10;
+        let zombieCurrentHealth = zombieHealth;
+        let gameInterval;
+
+        function addPlant() {
+            const plantArea = document.getElementById('plants-area');
+            const newPlant = document.createElement('div');
+            newPlant.className = 'plant';
+            plantArea.appendChild(newPlant);
+            plantCount++;
+        }
+
+        function startGame() {
+            if (plantCount === 0) {
+                alert('Por favor, adicione pelo menos uma planta!');
+                return;
+            }
+
+            zombieCurrentHealth = zombieHealth;
+            const timeInterval = 1000;
+            const resultElement = document.getElementById('result');
+            resultElement.textContent = '';
+
+            // Iniciar animação do zumbi se movendo
+            const zombieContainer = document.getElementById('zombie-container');
+            zombieContainer.style.transform = 'translateX(-400px)'; // Distância ajustada
+
+            gameInterval = setInterval(() => {
+                shootBullets();
+                zombieCurrentHealth -= damagePerBullet * plantCount;
+                updateHealthBar();
+                if (zombieCurrentHealth <= 0) {
+                    clearInterval(gameInterval);
+                    fadeOutZombie();
+                    resultElement.textContent = `Zumbi derrotado em ${10 / plantCount} segundos com ${plantCount} plantas!`;
+                }
+            }, timeInterval);
+        }
+
+        function shootBullets() {
+            const gameArea = document.getElementById('game-area');
+            const plants = document.getElementsByClassName('plant');
+            const zombie = document.getElementById('zombie');
+
+            for (let i = 0; i < plants.length; i++) {
+                const bullet = document.createElement('div');
+                bullet.className = 'bullet';
+                const plantRect = plants[i].getBoundingClientRect();
+                const gameAreaRect = gameArea.getBoundingClientRect();
+                const zombieRect = zombie.getBoundingClientRect();
+
+                bullet.style.left = `${plantRect.left - gameAreaRect.left + plants[i].offsetWidth / 2 - 5}px`; // Centralizar a partir da planta
+                bullet.style.top = `${plantRect.top - gameAreaRect.top + plants[i].offsetHeight / 2 - 5}px`; // Centralizar a partir da planta
+
+                gameArea.appendChild(bullet);
+
+                let bulletInterval = setInterval(() => {
+                    const bulletRect = bullet.getBoundingClientRect();
+                    const dx = (zombieRect.left + zombieRect.width / 2) - bulletRect.left;
+                    const dy = (zombieRect.top + zombieRect.height / 2) - bulletRect.top;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const moveX = dx / distance * 10;
+                    const moveY = dy / distance * 10;
+
+                    bullet.style.left = `${parseFloat(bullet.style.left) + moveX}px`;
+                    bullet.style.top = `${parseFloat(bullet.style.top) + moveY}px`;
+
+                    if (distance < 10) {
+                        clearInterval(bulletInterval);
+                        gameArea.removeChild(bullet);
+                    }
+                }, 30);
+            }
+        }
+
+        function updateHealthBar() {
+            const healthBar = document.getElementById('health');
+            const healthPercentage = (zombieCurrentHealth / zombieHealth) * 100;
+            healthBar.style.width = healthPercentage + '%';
+        }
+
+        function fadeOutZombie() {
+            const zombie = document.getElementById('zombie');
+            const healthBar = document.getElementById('health-bar');
+            zombie.style.opacity = 0;
+            healthBar.style.opacity = 0;
+        }
+
+        function resetGame() {
+            clearInterval(gameInterval);
+            document.getElementById('plants-area').innerHTML = '';
+            const zombieContainer = document.getElementById('zombie-container');
+            const zombie = document.getElementById('zombie');
+            const healthBar = document.getElementById('health-bar');
+            zombie.style.opacity = 1;
+            healthBar.style.opacity = 1;
+            zombieContainer.style.transition = 'none'; // Remove a transição
+            zombieContainer.style.transform = 'translateX(0)'; // Reset zumbi posição
+            setTimeout(() => {
+                zombieContainer.style.transition = 'transform 30s linear'; // Restaura a transição após resetar a posição
+            }, 50);
+            const health = document.getElementById('health');
+            health.style.width = '100%';
+            document.getElementById('result').textContent = '';
+            plantCount = 0;
+            zombieCurrentHealth = zombieHealth;
+        }
+    </script>
+</body>
+</html>
